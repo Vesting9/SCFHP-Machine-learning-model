@@ -1,0 +1,127 @@
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+
+
+df = pd.read_csv('')   #### CSV FILE GOES IN HERE.
+df.head()
+
+from sklearn.model_selection import train_test_split
+from sklearn.ensemble import RandomForestRegressor, RandomForestClassifier
+from sklearn.preprocessing import LabelEncoder
+from sklearn.metrics import mean_squared_error, accuracy_score
+
+# Ensure 'date_of_attendance' is in datetime format
+df['date_of_attendance'] = pd.to_datetime(df['date_of_attendance'])
+
+# Extract month as a feature
+df['Month'] = df['date_of_attendance'].dt.month
+
+# --- Prepare data for predicting total visitors ---
+# Group by month to get the total visitors per month
+monthly_visitors = df.groupby('Month').size().reset_index(name='Total_Visitors')
+
+# Prepare data for the regressor model
+X_visitor = monthly_visitors[['Month']]
+y_visitor = monthly_visitors['Total_Visitors']
+
+# Split data for visitor prediction
+X_train_visitor, X_test_visitor, y_train_visitor, y_test_visitor = train_test_split(X_visitor, y_visitor, test_size=0.25, random_state=42)
+
+# Train a RandomForestRegressor model
+visitor_model = RandomForestRegressor(n_estimators=300, random_state=42)
+visitor_model.fit(X_train_visitor, y_train_visitor)
+
+# Predict total visitors for the test set
+y_pred_visitor = visitor_model.predict(X_test_visitor)
+
+# Evaluate the visitor prediction model
+mse = mean_squared_error(y_test_visitor, y_pred_visitor)
+print(f"Mean Squared Error for Visitor Prediction: {mse}")
+
+# --- Prepare data for predicting event likelihood ---
+# For predicting event likelihood, we'll use individual attendance records.
+# We need features that might influence which event someone attends.
+# Let's use Month and Day of Week.
+
+# Convert 'day_of_week' to a categorical type if it's not already
+df['day_of_week'] = pd.Categorical(df['day_of_week'], categories=['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'], ordered=False)
+
+# One-hot encode categorical features for the classifier
+df_event = pd.get_dummies(df[['Month', 'day_of_week']], columns=['day_of_week'])
+
+# Label encode the target variable 'event_name'
+label_encoder = LabelEncoder()
+df_event['event_name_encoded'] = label_encoder.fit_transform(df['event_name'])
+
+# Prepare data for the classifier model
+X_event = df_event.drop('event_name_encoded', axis=1)
+y_event = df_event['event_name_encoded']
+
+# Handle potential new columns in the test set due to get_dummies
+# Align columns after one-hot encoding before splitting
+X_event = X_event.reindex(columns=X_event.columns, fill_value=0)
+
+
+# Split data for event likelihood prediction
+X_train_event, X_test_event, y_train_event, y_test_event = train_test_split(X_event, y_event, test_size=0.25, random_state=64)
+
+
+# Train a RandomForestClassifier model
+event_model = RandomForestClassifier(n_estimators=500, random_state=42)
+event_model.fit(X_train_event, y_train_event)
+
+# Predict event likelihood for the test set
+y_pred_event = event_model.predict(X_test_event)
+
+# Evaluate the event likelihood prediction model
+accuracy = accuracy_score(y_test_event, y_pred_event)
+print(f"Accuracy for Event Likelihood Prediction: {accuracy}")
+
+
+# --- How to use the models for prediction for a specific future month ---
+
+# Example: Predict for Month 1 (assuming your data has Month 1)
+future_month = 11
+
+# Predict total visitors for the future month
+future_month_df = pd.DataFrame({'Month': [future_month]})
+predicted_visitors = visitor_model.predict(future_month_df)[0]
+print(f"\nPredicted total visitors for Month {future_month}: {round(predicted_visitors)}")
+
+# To get likelihood of events for the future month, you would need
+# to define specific scenarios (e.g., a specific day of the week
+# in that future month) and pass them to the event_model.predict_proba.
+
+# Example: Likelihood of events for a Saturday in Month 1
+future_scenario = pd.DataFrame({'Month': [future_month],
+                                'day_of_week_Monday': [0],
+                                'day_of_week_Tuesday': [0],
+                                'day_of_week_Wednesday': [1],
+                                'day_of_week_Thursday': [0],
+                                'day_of_week_Friday': [0],
+                                'day_of_week_Saturday': [0],
+                                'day_of_week_Sunday': [0]
+                               })
+
+# Ensure the future_scenario DataFrame has the same columns as the training data after get_dummies
+future_scenario = future_scenario.reindex(columns=X_event.columns, fill_value=0)
+
+
+# Predict the probability of each event for this scenario
+event_probabilities = event_model.predict_proba(future_scenario)[0]
+
+# Get the event names corresponding to the probabilities
+predicted_event_names = label_encoder.inverse_transform(event_model.classes_)
+
+# Print the likelihood for each event
+print(f"\nLikelihood of events for Month {future_month}, Wedensday:") # CHANGE DAY OF THE WEEK HERE<-----------------------------------------
+for event_name, probability in zip(predicted_event_names, event_probabilities):
+  print(f"- {event_name}: {probability:.2f}")
+
+# Note: This is a basic example. For a more robust prediction,
+# you might consider time series models for visitor prediction
+# and more features/models for event likelihood prediction.
+from sklearn.model_selection import cross_val_score
+scores = cross_val_score(RandomForestClassifier(n_estimators=300, random_state=42), X_event, y_event, cv=10, scoring='accuracy', n_jobs=-1)
+print(f"Average Accuracy (10-fold CV): {scores.mean():.2f} (+/- {scores.std():.2f})")
