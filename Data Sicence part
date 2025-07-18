@@ -1,0 +1,83 @@
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+
+
+df = pd.read_csv('/content/PY Project excel dataset 2.0.csv')
+df.head()
+
+##########################
+event_counts = df['event_name'].value_counts()
+display(event_counts)
+
+week_day_counts = df['day_of_week'].value_counts()
+display(week_day_counts)
+
+##########################
+
+
+# Count the frequency of each zipcode
+zipcode_counts = df['attendee_zipcode'].value_counts()
+
+# Select the top N zipcodes for clarity (optional)
+top_n = 5  # You can adjust this number
+top_zipcodes = zipcode_counts.head(top_n)
+
+# Create the pie chart
+plt.figure(figsize=(10, 7)) # Adjust figure size for better spacing
+plt.pie(top_zipcodes, labels=top_zipcodes.index, autopct='%1.1f%%', startangle=140)
+
+# Add a title with some padding
+plt.title('Distribution of Top 5 Attendee Zipcodes', pad=20)
+
+# Ensure the pie chart is round
+plt.axis('equal')
+
+# Display the plot
+plt.show()
+
+##########################
+print(f"Total number of unique zipcodes: {len(zipcode_counts)}")
+
+# Display the list of unique zipcodes and their counts
+print("\nZipcode counts:")
+display(zipcode_counts)
+
+# Create a bar chart of the zipcode counts
+plt.figure(figsize=(12, 6))
+
+# Get a list of colors, one for each bar
+colors = plt.cm.get_cmap('tab10', len(zipcode_counts.index))
+
+zipcode_counts.plot(kind='bar', color=colors.colors)
+
+plt.title('Number of Attendees per Zipcode')
+plt.xlabel('Zipcode')
+plt.ylabel('Number of Attendees')
+plt.xticks(rotation=90) # Rotate x-axis labels for better readability
+plt.tight_layout() # Adjust layout to prevent labels from overlapping
+plt.show()
+
+########################
+# Convert 'date_of_attendance' to datetime objects
+df['date_of_attendance'] = pd.to_datetime(df['date_of_attendance'])
+
+# Extract the month from the date
+df['month'] = df['date_of_attendance'].dt.to_period('M')
+
+# Group by month and count the number of attendees
+monthly_attendance = df['month'].value_counts().sort_index()
+
+# Create the bar graph
+plt.figure(figsize=(10, 6))
+monthly_attendance.plot(kind='bar')
+plt.title('Monthly Attendance for 8 Months')
+plt.xlabel('Month')
+plt.ylabel('Number of Attendees')
+plt.xticks(rotation=45)
+plt.tight_layout()
+plt.show()
+
+########################
+
+
